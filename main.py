@@ -7,7 +7,7 @@ import numpy as np
 
 def main():
     grid_size = 50
-    steps = 100
+    steps = 100000
     T = 25
     H = 0.8
     barrier_size = 10
@@ -20,9 +20,12 @@ def main():
 
     engine = GrowthEngine(grid_size, T, H, steps)
     engine.fungal_density[initial_spore[1], initial_spore[0]] = 1.0
+    engine.cellular_automata_grid[initial_spore[1], initial_spore[0]] = True
 
-    for _ in range(5):
+    for _ in range(10):
         x, y = random.randint(0, grid_size - barrier_size), random.randint(0, grid_size - barrier_size)
+        if (x, y) == (initial_spore[0], initial_spore[1]):
+            continue
         engine.add_barrier(x, y, size=barrier_size)
 
     # engine.simulate(steps)
@@ -34,6 +37,7 @@ def display_simulation(engine, steps, scale):
 
     height, width = engine.fungal_density.shape
     width, height = width * scale, height * scale
+
     screen = pygame.display.set_mode((width, height))
     pygame.display.set_caption("Symulacja Grzybni")
 
@@ -51,31 +55,34 @@ def display_simulation(engine, steps, scale):
 
         engine.update_growth()
 
-        if step % 10 == 0:
-            fungal_density = engine.fungal_density
-            if np.max(fungal_density) > 0:
-                fungal_surface = (255 * fungal_density / np.max(fungal_density)).astype(np.uint8)
-            else:
-                fungal_surface = np.zeros_like(fungal_density)
+        fungal_density = engine.fungal_density
+        if np.max(fungal_density) > 0:
+            fungal_surface = (255 * fungal_density / np.max(fungal_density)).astype(np.uint8)
+        else:
+            fungal_surface = np.zeros_like(fungal_density)
 
-            fungal_surface = np.stack([np.zeros_like(fungal_surface), fungal_surface, np.zeros_like(fungal_surface)],
-                                      axis=-1)
+        fungal_surface = np.stack([np.zeros_like(fungal_surface), fungal_surface, np.zeros_like(fungal_surface)],
+                                  axis=-1)
+        # active_tips = np.argwhere(engine.cellular_automata_grid)  # Assuming tips are tracked here
+        # for tip in active_tips:
+        #     y, x = tip
+        #     fungal_surface[y, x] = [255, 0, 0]
 
-            nutrients = engine.nutrients
-            if np.max(nutrients) > 0:
-                nutrient_surface = (255 * nutrients / np.max(nutrients)).astype(np.uint8)
-            else:
-                nutrient_surface = np.zeros_like(nutrients)
+        nutrients = engine.nutrients
+        if np.max(nutrients) > 0:
+            nutrient_surface = (255 * nutrients / np.max(nutrients)).astype(np.uint8)
+        else:
+            nutrient_surface = np.zeros_like(nutrients)
 
-            nutrient_surface = np.stack(
-                [np.zeros_like(nutrient_surface), np.zeros_like(nutrient_surface), nutrient_surface], axis=-1)
+        nutrient_surface = np.stack(
+            [np.zeros_like(nutrient_surface), np.zeros_like(nutrient_surface), nutrient_surface], axis=-1)
 
-            combined_surface = fungal_surface + nutrient_surface
+        combined_surface = fungal_surface + nutrient_surface
 
-            pygame_surface = pygame.surfarray.make_surface(np.transpose(combined_surface, (1, 0, 2)))
+        pygame_surface = pygame.surfarray.make_surface(np.transpose(combined_surface, (1, 0, 2)))
 
-            screen.blit(pygame.transform.scale(pygame_surface, (width, height)), (0, 0))
-            pygame.display.flip()
+        screen.blit(pygame.transform.scale(pygame_surface, (width, height)), (0, 0))
+        pygame.display.flip()
 
         clock.tick(30)
     GrowthEngine.render(engine, steps)
