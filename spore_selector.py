@@ -2,20 +2,24 @@ import pygame
 import numpy as np
 
 
-def select_spore_location(engine, cell_size=20):
-    """Allow the user to select the initial spore location on the generated substrate."""
+def select_spore_location_and_conditions(engine, cell_size=20):
+    """Allow the user to select the initial spore location and environmental conditions."""
     grid_size = engine.grid_size
     pygame.init()
-    screen = pygame.display.set_mode((grid_size * cell_size, grid_size * cell_size))
-    pygame.display.set_caption("Select Spore Location")
+    screen = pygame.display.set_mode((grid_size * cell_size, grid_size * cell_size + 100))
+    pygame.display.set_caption("Select Spore Location and Environmental Conditions")
 
+    font = pygame.font.Font(None, 36)
     running = True
     selected_position = None
+    temp = engine.T  # Default temperature
+    humidity = engine.H  # Default humidity
 
     while running:
+        # Clear the screen
         screen.fill((0, 0, 0))
 
-        # Draw the substrate levels
+        # Draw the substrate levels (the main grid)
         for i in range(grid_size):
             for j in range(grid_size):
                 if engine.grid[i, j] == -1:  # Barrier
@@ -32,22 +36,38 @@ def select_spore_location(engine, cell_size=20):
                 cell_size,
                 cell_size
             )
-            pygame.draw.rect(screen, (0, 255, 0), rect)
+            pygame.draw.rect(screen, (0, 255, 0), rect, 2)  # Green border for selected cell
 
+        # Draw the controls for temperature and humidity
+        temp_text = font.render(f"Temperature (T): {temp}°C", True, (255, 255, 255))
+        hum_text = font.render(f"Humidity (H): {humidity*100:.0f}%", True, (255, 255, 255))
+        screen.blit(temp_text, (10, grid_size * cell_size + 10))
+        screen.blit(hum_text, (10, grid_size * cell_size + 50))
+
+        # Update the display
         pygame.display.flip()
 
+        # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                cell_x, cell_y = x // cell_size, y // cell_size
-                # Ensure the selected position is not on a barrier
-                if engine.grid[cell_y, cell_x] != -1:
-                    selected_position = (cell_x, cell_y)
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                if selected_position:
+                if y < grid_size * cell_size:  # Clicked on the grid
+                    cell_x, cell_y = x // cell_size, y // cell_size
+                    if 0 <= cell_x < grid_size and 0 <= cell_y < grid_size and engine.grid[cell_y, cell_x] != -1:
+                        selected_position = (cell_x, cell_y)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN and selected_position:
                     running = False
+                elif event.key == pygame.K_UP:  # Increase temperature
+                    temp += 1
+                elif event.key == pygame.K_DOWN:  # Decrease temperature
+                    temp -= 1
+                elif event.key == pygame.K_RIGHT:  # Increase humidity
+                    humidity = min(1.0, humidity + 0.05)
+                elif event.key == pygame.K_LEFT:  # Decrease humidity
+                    humidity = max(0.0, humidity - 0.05)
 
     pygame.quit()
-    return selected_position
+    return selected_position, temp, humidity
