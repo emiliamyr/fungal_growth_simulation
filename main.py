@@ -1,91 +1,74 @@
 from growth_engine import GrowthEngine
-from spore_selector import select_spore_location
+from spore_selector import select_spore_location_and_conditions
 import random
 import pygame
-import numpy as np
-
+import csv
 
 def main():
-    grid_size = 50
-    steps = 100000
+    grid_size = 70
+    steps = 100
     T = 25
     H = 0.8
     barrier_size = 10
     scale = 10
+    num_tips = 10
+    results = []
 
-    initial_spore = select_spore_location(grid_size)
-    if not initial_spore:
+    engine = GrowthEngine(grid_size, T, H, steps)
+
+    for _ in range(0):
+        x, y = random.randint(0, grid_size - barrier_size), random.randint(0, grid_size - barrier_size)
+        engine.add_barrier(x, y, barrier_size)
+
+    spore_location, T, H = select_spore_location_and_conditions(engine, cell_size=scale)
+    if spore_location is None:
         print("No spore location selected. Exiting.")
         return
 
-    engine = GrowthEngine(grid_size, T, H, steps)
-    engine.fungal_density[initial_spore[1], initial_spore[0]] = 1.0
-    engine.cellular_automata_grid[initial_spore[1], initial_spore[0]] = True
+    engine.T = T
+    engine.H = H
+    engine.initialize_circular_tips(spore_location[0], spore_location[1], num_tips)
+    output_file = f"fungal_growth_results_{T}_{H}.csv"
 
-    for _ in range(10):
-        x, y = random.randint(0, grid_size - barrier_size), random.randint(0, grid_size - barrier_size)
-        if (x, y) == (initial_spore[0], initial_spore[1]):
-            continue
-        engine.add_barrier(x, y, size=barrier_size)
+    display_simulation(engine, steps, scale, output_file)
 
-    # engine.simulate(steps)
-    display_simulation(engine, steps, scale)
+def save_to_file(filename, data):
+    """Zapisuje dane do pliku CSV."""
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Step", "Occupied Area (%)"])  # Nagłówki
+        writer.writerows(data)
 
-
-def display_simulation(engine, steps, scale):
+def display_simulation(engine, steps, scale, output_file):
     pygame.init()
 
-    height, width = engine.fungal_density.shape
-    width, height = width * scale, height * scale
-
-    screen = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Symulacja Grzybni")
+    screen = pygame.display.set_mode((engine.grid_size * scale, engine.grid_size * scale))
+    pygame.display.set_caption("Enhanced Fungal Growth Simulation with Barriers")
 
     clock = pygame.time.Clock()
     running = True
-
+    results = []
     for step in range(steps):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                break
 
         if not running:
             break
 
-        engine.update_growth()
+        engine.simulate_one_step()
+        engine.update_substrate()
 
-        fungal_density = engine.fungal_density
-        if np.max(fungal_density) > 0:
-            fungal_surface = (255 * fungal_density / np.max(fungal_density)).astype(np.uint8)
-        else:
-            fungal_surface = np.zeros_like(fungal_density)
+        occupied_area = engine.calculate_occupied_area_percentage()
+        results.append([step, occupied_area])
 
-        fungal_surface = np.stack([np.zeros_like(fungal_surface), fungal_surface, np.zeros_like(fungal_surface)],
-                                  axis=-1)
-        # active_tips = np.argwhere(engine.cellular_automata_grid)  # Assuming tips are tracked here
-        # for tip in active_tips:
-        #     y, x = tip
-        #     fungal_surface[y, x] = [255, 0, 0]
-
-        nutrients = engine.nutrients
-        if np.max(nutrients) > 0:
-            nutrient_surface = (255 * nutrients / np.max(nutrients)).astype(np.uint8)
-        else:
-            nutrient_surface = np.zeros_like(nutrients)
-
-        nutrient_surface = np.stack(
-            [np.zeros_like(nutrient_surface), np.zeros_like(nutrient_surface), nutrient_surface], axis=-1)
-
-        combined_surface = fungal_surface + nutrient_surface
-
-        pygame_surface = pygame.surfarray.make_surface(np.transpose(combined_surface, (1, 0, 2)))
-
-        screen.blit(pygame.transform.scale(pygame_surface, (width, height)), (0, 0))
+        screen.fill((0, 0, 0))
+        engine.visualize(screen, scale)
         pygame.display.flip()
 
-        clock.tick(30)
-    GrowthEngine.render(engine, steps)
+        clock.tick(6)
+
+    save_to_file(output_file, results)
     pygame.quit()
 
 
